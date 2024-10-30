@@ -165,12 +165,12 @@ add_action('admin_enqueue_scripts', function($hook) {
                     if (name) names.push(name);
                 });
 
-                // Copy to clipboard
-                const tempInput = $('<input>');
-                $('body').append(tempInput);
-                tempInput.val(names.join('\\n')).select();
+                // Create a temporary textarea instead of input for better newline handling
+                const tempTextArea = $('<textarea>');
+                $('body').append(tempTextArea);
+                tempTextArea.val(names.join('\\r\\n')).select();
                 document.execCommand('copy');
-                tempInput.remove();
+                tempTextArea.remove();
 
                 // Visual feedback
                 $(this).css('color', '#00a32a');
