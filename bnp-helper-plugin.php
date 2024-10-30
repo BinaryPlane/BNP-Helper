@@ -12,6 +12,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Include required files
+require_once ABSPATH . 'wp-admin/includes/plugin.php';
+
 // Add updater class
 class GitHub_Plugin_Updater {
     private $file;
@@ -34,12 +37,11 @@ class GitHub_Plugin_Updater {
 
     public function set_plugin_properties() {
         $this->plugin = get_plugin_data($this->file);
-        $this->username = 'BinaryPlane';    // Changed to your organization name
-        $this->repository = 'BNP-Helper';   // Changed to your repository name
+        $this->username = 'BinaryPlane';    // Your organization name
+        $this->repository = 'BNP-Helper';   // Your repository name
         $this->authorize_token = null;      // Can be added later if needed
     }
 
-    // Rest of the updater class remains the same as before
     private function get_repository_info() {
         if (is_null($this->github_response)) {
             $request_uri = sprintf('https://api.github.com/repos/%s/%s/releases/latest', $this->username, $this->repository);
