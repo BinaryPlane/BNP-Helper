@@ -2,8 +2,8 @@
 /*
 Plugin Name: Helper Plugin
 Description: This plugin is used for the site's maintenance. Must not be removed.
-Version: 1.1.1
-Author: Moazzam
+Version: 1.1.2
+Author: BinaryPlane
 GitHub Plugin URI: BinaryPlane/BNP-Helper
 */
 
@@ -37,9 +37,9 @@ class GitHub_Plugin_Updater {
 
     public function set_plugin_properties() {
         $this->plugin = get_plugin_data($this->file);
-        $this->username = 'BinaryPlane';    // Your organization name
-        $this->repository = 'BNP-Helper';   // Your repository name
-        $this->authorize_token = null;      // Can be added later if needed
+        $this->username = 'BinaryPlane';
+        $this->repository = 'BNP-Helper';
+        $this->authorize_token = null;
     }
 
     private function get_repository_info() {
@@ -51,10 +51,18 @@ class GitHub_Plugin_Updater {
                 $args['headers']['Authorization'] = "bearer {$this->authorize_token}";
             }
 
-            $response = json_decode(wp_remote_retrieve_body(wp_remote_get($request_uri, $args)), true);
+            $response = wp_remote_get($request_uri, $args);
+            
+            // Check if the request was successful
+            if (is_wp_error($response)) {
+                return false;
+            }
 
-            if (is_array($response)) {
-                $this->github_response = $response;
+            $response_body = wp_remote_retrieve_body($response);
+            $result = json_decode($response_body, true);
+
+            if (is_array($result)) {
+                $this->github_response = $result;
             }
         }
     }
@@ -66,25 +74,39 @@ class GitHub_Plugin_Updater {
     }
 
     public function modify_transient($transient) {
-        if (property_exists($transient, 'checked')) {
-            if ($checked = $transient->checked) {
-                $this->get_repository_info();
-                $out_of_date = version_compare($this->github_response['tag_name'], $checked[$this->basename], 'gt');
+        if (!property_exists($transient, 'checked')) {
+            return $transient;
+        }
 
-                if ($out_of_date) {
-                    $new_files = $this->github_response['zipball_url'];
-                    $slug = current(explode('/', $this->basename));
+        $this->get_repository_info();
+        
+        // If no GitHub response, return unchanged
+        if (empty($this->github_response)) {
+            return $transient;
+        }
 
-                    $plugin = array(
-                        'url' => $this->plugin["PluginURI"],
-                        'slug' => $slug,
-                        'package' => $new_files,
-                        'new_version' => $this->github_response['tag_name']
-                    );
+        // Get the current plugin version
+        $checked = $transient->checked;
+        $current_version = isset($checked[$this->basename]) ? $checked[$this->basename] : '0.0';
+        
+        // Get the new version from GitHub
+        $latest_version = !empty($this->github_response['tag_name']) ? $this->github_response['tag_name'] : '0.0';
 
-                    $transient->response[$this->basename] = (object) $plugin;
-                }
-            }
+        // Compare versions
+        $out_of_date = version_compare($latest_version, $current_version, 'gt');
+
+        if ($out_of_date) {
+            $new_files = !empty($this->github_response['zipball_url']) ? $this->github_response['zipball_url'] : '';
+            $slug = current(explode('/', $this->basename));
+
+            $plugin = array(
+                'url' => $this->plugin["PluginURI"],
+                'slug' => $slug,
+                'package' => $new_files,
+                'new_version' => $latest_version
+            );
+
+            $transient->response[$this->basename] = (object) $plugin;
         }
 
         return $transient;
@@ -92,30 +114,32 @@ class GitHub_Plugin_Updater {
 
     public function plugin_popup($result, $action, $args) {
         if ($action !== 'plugin_information') {
-            return false;
+            return $result;
         }
 
         if (!empty($args->slug)) {
             if ($args->slug == current(explode('/' , $this->basename))) {
                 $this->get_repository_info();
 
-                $plugin = array(
-                    'name'              => $this->plugin["Name"],
-                    'slug'              => $this->basename,
-                    'version'           => $this->github_response['tag_name'],
-                    'author'            => $this->plugin["AuthorName"],
-                    'author_profile'    => $this->plugin["AuthorURI"],
-                    'last_updated'      => $this->github_response['published_at'],
-                    'homepage'          => $this->plugin["PluginURI"],
-                    'short_description' => $this->plugin["Description"],
-                    'sections'          => array(
-                        'Description'   => $this->plugin["Description"],
-                        'Updates'       => $this->github_response['body'],
-                    ),
-                    'download_link'     => $this->github_response['zipball_url']
-                );
+                if (!empty($this->github_response)) {
+                    $plugin = array(
+                        'name'              => $this->plugin["Name"],
+                        'slug'              => $this->basename,
+                        'version'           => $this->github_response['tag_name'],
+                        'author'            => $this->plugin["AuthorName"],
+                        'author_profile'    => $this->plugin["AuthorURI"],
+                        'last_updated'      => $this->github_response['published_at'],
+                        'homepage'          => $this->plugin["PluginURI"],
+                        'short_description' => $this->plugin["Description"],
+                        'sections'          => array(
+                            'Description'   => $this->plugin["Description"],
+                            'Updates'       => $this->github_response['body'],
+                        ),
+                        'download_link'     => $this->github_response['zipball_url']
+                    );
 
-                return (object) $plugin;
+                    return (object) $plugin;
+                }
             }
         }
         return $result;
@@ -136,7 +160,6 @@ class GitHub_Plugin_Updater {
     }
 }
 
-// Your existing plugin functionality
 add_action('admin_enqueue_scripts', function($hook) {
     // Only load on updates page
     if ($hook !== 'update-core.php') {
@@ -165,7 +188,7 @@ add_action('admin_enqueue_scripts', function($hook) {
                     if (name) names.push(name);
                 });
 
-                // Create a temporary textarea instead of input for better newline handling
+                // Create a temporary textarea for better newline handling
                 const tempTextArea = $('<textarea>');
                 $('body').append(tempTextArea);
                 tempTextArea.val(names.join('\\r\\n')).select();
