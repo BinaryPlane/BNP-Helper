@@ -2,7 +2,7 @@
 /*
 Plugin Name: Helper Plugin
 Description: This plugin is used for the site's maintenance. Must not be removed.
-Version: 1.1.2
+Version: 1.2
 Author: BinaryPlane
 GitHub Plugin URI: BinaryPlane/BNP-Helper
 */
